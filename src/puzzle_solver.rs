@@ -188,11 +188,14 @@ impl<'a> PuzzleSolver<'a>
 		/* test for jumping atop a block to the right */
 		if self.position_has_foothold(pos.add(1, -1)) /* should also test for ceilings */
 			{ outvec.push(pos.add(1, -1)); }
+			
+		/* falling to ground level */
+		outvec.push(CellPosition{ x: 0, y: self.config.height - 1});
 	}
 	
 	
 	pub fn get_reachable_recursive(&self, pos: CellPosition) -> Vec<CellPosition>
-	{
+	{	
 		let mut to_check = Vec::new();
 		to_check.push(pos);
 		
@@ -201,6 +204,7 @@ impl<'a> PuzzleSolver<'a>
 		let mut check_index = 0;
 		while check_index < to_check.len()
 		{
+			reachable_temp_vec.clear();
 			self.get_reachable_at(&mut reachable_temp_vec, to_check[check_index]);
 			
 			for r in reachable_temp_vec.iter()
@@ -216,7 +220,6 @@ impl<'a> PuzzleSolver<'a>
 					{ to_check.push(*r); }
 			}
 			
-			reachable_temp_vec.clear();
 			check_index += 1;
 		}
 		
@@ -274,7 +277,15 @@ impl<'a> PuzzleSolver<'a>
 	pub fn solve(&mut self) -> Option<Vec<PlayerMovement>>
 	{
 		let mut moves_temp = Vec::new();
-		return self.solve_search(0, &mut moves_temp);
+		for depth in 1..15
+		{
+			println!("[Searching up to depth {}]", depth);
+			self.solve_max_depth = depth;
+			let solution = self.solve_search(0, &mut moves_temp);
+			if let Some(_) = solution
+				{ return solution; }
+		}
+		return None;
 	}
 	
 	
@@ -309,6 +320,8 @@ impl<'a> PuzzleSolver<'a>
 		for m_index in 0..moves_temp[depth as usize].len()
 		{
 			self.solve_movement_tests += 1;
+			if self.solve_movement_tests % 100000 == 0
+				{ println!("Checked {} moves so far...", self.solve_movement_tests); }
 			
 			let undo = self.apply_move(&moves_temp[depth as usize][m_index]);
 			let solution = self.solve_search(depth + 1, &mut moves_temp);
@@ -331,7 +344,19 @@ impl<'a> PuzzleSolver<'a>
 		{
 			for x in 0..self.config.width
 			{
-				print!("{} ", self.get_pull_level_at(CellPosition{ x: x, y: y }));
+				let pos = CellPosition{ x: x, y: y };
+				if self.get_piece_at(pos) == -1
+					{ print!(". "); }
+				else
+				{
+					print!("{}", self.get_pull_level_at(pos));
+					
+					let next_pos = CellPosition{ x: x + 1, y: y };
+					if self.get_piece_at(next_pos) == self.get_piece_at(pos)
+						{ print!("="); }
+					else
+						{ print!(" "); }
+				}
 			}
 			println!("");
 			for x in 0..self.config.width
@@ -341,7 +366,19 @@ impl<'a> PuzzleSolver<'a>
 				else if self.config.goal.x == x && self.config.goal.y == y
 					{ print!("*"); }
 				else
-					{ print!(" "); }
+				{
+					let pos = CellPosition{ x: x, y: y };
+					if self.get_piece_at(pos) == -1
+						{ print!(" "); }
+					else
+					{
+						let next_pos = CellPosition{ x: x, y: y + 1 };
+						if self.get_piece_at(next_pos) == self.get_piece_at(pos)
+							{ print!("|"); }
+						else
+							{ print!(" "); }
+					}
+				}
 					
 				print!(" ");
 			}
